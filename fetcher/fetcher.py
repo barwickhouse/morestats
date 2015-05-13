@@ -1,13 +1,11 @@
 '''Functions for cloning from sites like github, gitorous, etc. and
 the Cloner class for constructing a single-threaded worker.'''
-
+from constants import REPO_BASE_DIR
 import os
 
 from subprocess import Popen
 from queue import Queue
 from threading import Thread
-
-REPO_BASE_DIR = "/home/john/repositories"
 
 
 def repo_to_subdir(url):
