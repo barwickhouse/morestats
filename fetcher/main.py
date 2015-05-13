@@ -1,6 +1,7 @@
 from constants import REPO_BASE_DIR, RDB_HOST, RDB_PORT, RDB_NAME
 import rethinkdb as r
 import sys
+from pprint import pprint
 from fetcher import Cloner
 from git import Repo
 from rethinkdb.errors import RqlRuntimeError, RqlDriverError
@@ -20,7 +21,6 @@ def get_genders(names):
     results = json.loads(req.text)
     retrn = []
     for result in results:
-        print(result)
         if "gender" in result and result["gender"]:
             retrn.append((result["gender"], result["probability"], result["count"]))
         else:
@@ -84,11 +84,13 @@ def contributor_genders(contributors):
     names = []
     genders = []
     base = 0
+    data = []
     for contributor in contributors:
         # gotta get first name
         authorname = contributor["author"].split(' ')
         if authorname and authorname[0].isalpha():
             names.append(authorname[0])
+            data.append(contributor)
 
     unentered_names = []
     for name in names:
@@ -106,11 +108,16 @@ def contributor_genders(contributors):
                                                 "probability": answer[1]}).run(connection)
     contributor_stats = []
     c = 0
-    for contributor in contributors:
+    for contributor in data:
         tmp = {"author": contributor["author"], "email": contributor["email"]}
-        tmp.update(r.db(RDB_NAME).table("sex").get(names[c]).run(connection))
-        contributor_stats.append(tmp)
+        res = r.db(RDB_NAME).table("sex").get(names[c]).run(connection)
+        print(res)
+        # skip the None genders
+        if res:
+            tmp.update(res)
+            contributor_stats.append(tmp)
         c += 1
+    print(contributor_stats)
     return contributor_stats
     
     
@@ -118,6 +125,8 @@ if __name__ == '__main__':
     connection = r.connect(host=RDB_HOST, port=RDB_PORT)
     if "--setup" in sys.argv:
         setup_database()
+    elif "--report" in sys.argv:
+        pprint(r.db(RDB_NAME).table("project").get(["rust-lang", "rust"]).run(connection))
     else:
         REPOCLONER = Cloner(submit_stats)
         for url in sys.argv[1:]:
