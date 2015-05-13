@@ -55,9 +55,11 @@ class Cloner:
         self.work_queue = Queue()
         self.handler = handler
         self.worker = Thread(target=self._work)
-        self.worker.setDaemon(True)
+        self.worker.setDaemon(False)
+        
+    def start(self):
         self.worker.start()
-    
+        
     def add_work(self, repo):
         '''Add a repository to be cloned.'''
         self.work_queue.put(repo)
@@ -68,12 +70,11 @@ class Cloner:
         clone.
 
         '''
-        while True:
-            if not self.work_queue.empty():
-                next_url = self.work_queue.get()
-                code = mkdirs_clone(next_url).wait()
-                self.work_queue.task_done()
-                self.handler(next_url, code)
+        while not self.work_queue.empty():
+            next_url = self.work_queue.get()
+            code = mkdirs_clone(next_url).wait()
+            self.handler(next_url, code)
+            self.work_queue.task_done()
                 
 if __name__ == '__main__':
     def my_notifier(repo, code):

@@ -61,10 +61,11 @@ def submit_stats(url, code):
     path = url.split('/')[-2:]
     gitdir = REPO_BASE_DIR + '/' + path[0] + '/' + path[1]
     contributors = git_stats(gitdir)
+    stats = contributor_genders(contributors)
     project = {"path": path,
-               "contributors": contributors}
+               "contributors": stats}
     r.db(RDB_NAME).table("project").insert(project).run(connection)
-    contributor_genders(contributors)
+    
 
 def partition(lst, n):
     lsts = []
@@ -103,13 +104,14 @@ def contributor_genders(contributors):
             r.db(RDB_NAME).table("sex").insert({"name": unentered_names[i],
                                                 "sex": answer[0],
                                                 "probability": answer[1]}).run(connection)
-    tuples = []
+    contributor_stats = []
     c = 0
     for contributor in contributors:
-        tuples.append((contributor["author"], r.db(RDB_NAME).table("sex").get(names[c]).run(connection)))
+        tmp = {"author": contributor["author"], "email": contributor["email"]}
+        tmp.update(r.db(RDB_NAME).table("sex").get(names[c]).run(connection))
+        contributor_stats.append(tmp)
         c += 1
-    print (tuples)
-    return tuples
+    return contributor_stats
     
     
 if __name__ == '__main__':
@@ -118,10 +120,7 @@ if __name__ == '__main__':
         setup_database()
     else:
         REPOCLONER = Cloner(submit_stats)
-        REPOCLONER.add_work("https://github.com/johnwalker/lein-plz")
-        REPOCLONER.add_work("https://github.com/johnwalker/astrolander")
-        print(r.db(RDB_NAME).table("sex").run(connection))
-        print(r.db(RDB_NAME).table("project").run(connection))
-        while True:
-            pass
+        for url in sys.argv[1:]:
+            REPOCLONER.add_work(url)
+        REPOCLONER.start()
     
