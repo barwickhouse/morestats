@@ -1,4 +1,4 @@
-from constants import REPO_BASE_DIR
+from constants import REPO_BASE_DIR, RDB_HOST, RDB_PORT, RDB_NAME
 import rethinkdb as r
 import sys
 from fetcher import Cloner
@@ -8,12 +8,9 @@ from subprocess import Popen
 
 
 def setup_database():
-    connection = r.connect(host=RDB_HOST, port=RDB_PORT)
     try:
         r.db_create(RDB_NAME).run(connection)
-        r.db(RDB_NAME).table_create('developers').run(connection)
-        r.db(RDB_NAME).table_create('projects').run(connection)
-        r.db(RDB_NAME).table_create('projectdevelopers').run(connection)
+        r.db(RDB_NAME).table_create('project', primary_key='path').run(connection)
         print("Database setup completed. Rerun without --setup.")
     except RqlRuntimeError:
         print("Runtime error. Database might already exist. Try running without --setup.")
@@ -30,17 +27,26 @@ def git_stats(cwd):
         else:
             d[commit.author.email] = {"author": commit.author.name,
                                       "commits": 1}
-    return d
+
+    contributors = []
+    for k, v in d.items():
+        contributors.append(v)
+        contributors[-1]["email"] = k
+
+    return contributors
 
 
 def submit_stats(url, code):
-    tmp = url.split('/')[-2:]
-    gitdir = REPO_BASE_DIR + '/' + tmp[0] + '/' + tmp[1]
-    print(gitdir)
-    
-    print(git_stats(gitdir))
+    path = url.split('/')[-2:]
+    gitdir = REPO_BASE_DIR + '/' + path[0] + '/' + path[1]
+    contributors = git_stats(gitdir)
+    project = {"path": path,
+               "contributors": contributors}
+    r.db(RDB_NAME).table("project").insert(project).run(connection)
 
 if __name__ == '__main__':
+    connection = r.connect(host=RDB_HOST, port=RDB_PORT)
+    print(r.db(RDB_NAME).table("project").run(connection))
     if "--setup" in sys.argv:
         setup_database()
     else:
